@@ -719,3 +719,55 @@ plt.ylabel('Postal Codes')
 plt.show()
 
 #PLOT 2
+# Convert the 'RentalPeriodFrom' column to datetime format (if it's not already)
+data_MBF['RentalPeriodFrom'] = pd.to_datetime(data_MBF['RentalPeriodFrom'])
+
+dataframes_by_year = {}
+
+# Loop through the years from 2016 to 2024
+for year in range(2016, 2025):
+    # Define the start and end date for the current year
+    start_date = f'{year}-01-01'
+    end_date = f'{year}-12-31'
+    
+    # Filter the DataFrame for rows where 'RentalPeriodFrom' is within the current year
+    dataframes_by_year[year] = data_MBF[(data_MBF['RentalPeriodFrom'] >= start_date) & (data_MBF['RentalPeriodFrom'] <= end_date)]
+
+median_rental_by_year = {}
+
+# Loop through each year's DataFrame
+for year, df in dataframes_by_year.items():
+    # Group by 'postalCode' and calculate the median for 'RentalFeeMonthly'
+    median_rental_by_postal_code = df.groupby('location_postalCode')['RentalFeeMonthly'].median()
+    
+    # Store the result in a new dictionary with the year as the key
+    median_rental_by_year[year] = median_rental_by_postal_code
+    
+print("Median Rental Fee by Postal Code for 2016:")
+print(median_rental_by_year[2016])
+
+print("Median Rental Fee by Postal Code for 2024:")
+print(median_rental_by_year[2024])
+
+
+# Convert the dictionary of median rental fees by year to a DataFrame
+median_rental_by_year_DataFrame = pd.DataFrame(median_rental_by_year)
+
+# Transpose the DataFrame so that the years become the columns and postal codes the rows
+median_rental_by_year_DataFrame = median_rental_by_year_DataFrame.T  # This flips the DataFrame, years as rows and postal codes as columns
+
+# Plot the evolution of median rental prices for each postal code
+plt.figure(figsize=(10, 6))
+
+# Loop through each postal code and plot its evolution over the years
+for postal_code in median_rental_by_year_DataFrame.columns:
+    plt.plot(median_rental_by_year_DataFrame.index, median_rental_by_year_DataFrame[postal_code], label=f'Postal Code {postal_code}')
+
+# Add labels and title
+plt.xlabel('Year')
+plt.ylabel('Median Rental Fee (Monthly)')
+plt.title('Evolution of Median Rental Fee by Postal Code (2016-2024)')
+plt.legend(title='Postal Codes')  # Add a legend with postal codes
+
+# Display the plot
+plt.show()
