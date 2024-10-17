@@ -771,3 +771,208 @@ plt.legend(title='Postal Codes')  # Add a legend with postal codes
 
 # Display the plot
 plt.show()
+
+#PLOT 3
+import matplotlib.pyplot as plt
+import pandas as pd
+
+# Convert the 'RentalPeriodFrom' column to datetime format (if it's not already)
+data_MBF['RentalPeriodFrom'] = pd.to_datetime(data_MBF['RentalPeriodFrom'])
+
+# Filter out the 'Unknown' MappedRealEstateType
+data_MBF_filtered = data_MBF[data_MBF['MappedRealEstateType'] != 'Unknown']
+
+# Get the unique values for MappedRealEstateType, excluding 'Unknown'
+unique_types = data_MBF_filtered['MappedRealEstateType'].unique()
+
+# Set up the figure and axis grid for subplots
+n_types = len(unique_types)
+n_cols = 3  # Number of columns for the subplot grid
+n_rows = (n_types + n_cols - 1) // n_cols  # Calculate number of rows needed
+
+fig, axes = plt.subplots(n_rows, n_cols, figsize=(15, n_rows * 5))
+axes = axes.flatten()  # Flatten the axis array for easy indexing
+
+# Loop through each unique MappedRealEstateType and create a separate subplot
+for i, realestate_type in enumerate(unique_types):
+    dataframes_by_year = {}
+
+    # Filter the DataFrame by the current MappedRealEstateType
+    type_df = data_MBF_filtered[data_MBF_filtered['MappedRealEstateType'] == realestate_type]
+
+    # Create a dictionary to store the count of observations per postal code per year
+    count_by_postal_code = {}
+
+    # Loop through the years from 2016 to 2024
+    for year in range(2016, 2025):
+        # Define the start and end date for the current year
+        start_date = f'{year}-01-01'
+        end_date = f'{year}-12-31'
+
+        # Filter the DataFrame for rows where 'RentalPeriodFrom' is within the current year
+        dataframes_by_year[year] = type_df[(type_df['RentalPeriodFrom'] >= start_date) & (type_df['RentalPeriodFrom'] <= end_date)]
+
+        # Group by 'location_postalCode' and count the number of observations for each postal code
+        postal_code_counts = dataframes_by_year[year].groupby('location_postalCode')['RentalFeeMonthly'].count()
+
+        # Store the counts for each postal code over the years
+        for postal_code, count in postal_code_counts.items():
+            if postal_code not in count_by_postal_code:
+                count_by_postal_code[postal_code] = {}
+            count_by_postal_code[postal_code][year] = count
+
+    # Dictionary to store median rental prices per year for valid postal codes
+    median_rental_by_year = {}
+
+    # Loop through each year's DataFrame again to calculate median rental price only when count >= 100
+    for year, df in dataframes_by_year.items():
+        # Group by 'location_postalCode' and calculate the median for 'RentalFeeMonthly'
+        median_rental_by_postal_code = df.groupby('location_postalCode')['RentalFeeMonthly'].median()
+
+        # Only include postal codes that have 100 or more observations for that year
+        valid_postal_codes = [postal_code for postal_code, counts in count_by_postal_code.items() if counts.get(year, 0) >= 5]
+
+        # Filter median values for valid postal codes
+        filtered_median = median_rental_by_postal_code[median_rental_by_postal_code.index.isin(valid_postal_codes)]
+        
+        # Store the result in a new dictionary with the year as the key
+        median_rental_by_year[year] = filtered_median
+
+    # Convert the dictionary of median rental fees by year to a DataFrame
+    median_rental_by_year_DataFrame = pd.DataFrame(median_rental_by_year)
+
+    # Transpose the DataFrame so that the years become the columns and postal codes the rows
+    median_rental_by_year_DataFrame = median_rental_by_year_DataFrame.T  # This flips the DataFrame, years as rows and postal codes as columns
+
+    # Plot the evolution of median rental prices for each postal code for the current MappedRealEstateType
+    ax = axes[i]
+    for postal_code in median_rental_by_year_DataFrame.columns:
+        ax.plot(median_rental_by_year_DataFrame.index, median_rental_by_year_DataFrame[postal_code], label=f'{postal_code}', marker='o')
+
+    # Add labels and title to each subplot
+    ax.set_xlabel('Year')
+    ax.set_ylabel('Median Rental Fee (Monthly)')
+    ax.set_title(f'{realestate_type}')
+    ax.legend(title='Postal Codes', fontsize='small', loc='upper left', bbox_to_anchor=(1, 1))
+
+# Hide any empty subplots if the grid is larger than the number of plots
+for j in range(i + 1, len(axes)):
+    fig.delaxes(axes[j])
+
+# Adjust layout to ensure all subplots fit nicely
+plt.tight_layout()
+
+# Show the final plot with all subplots
+plt.show()
+
+#tests
+# Convert 'RentalPeriodFrom' to datetime format (if it's not already)
+data_MBF['RentalPeriodFrom'] = pd.to_datetime(data_MBF['RentalPeriodFrom'])
+
+# Extract the year from 'RentalPeriodFrom' and group by year to count observations
+observations_per_year = data_MBF.groupby(data_MBF['RentalPeriodFrom'].dt.year).size()
+
+# Display the number of observations per year
+print(observations_per_year)
+
+# Get the total number of observations (rows) in the dataset
+total_observations = data_MBF.shape[0]
+
+print(f"Total number of observations in the dataset: {total_observations}")
+
+# Convert 'RentalPeriodFrom' to datetime format (if it's not already)
+data_MBF['RentalPeriodFrom'] = pd.to_datetime(data_MBF['RentalPeriodFrom'])
+
+# Extract the year from 'RentalPeriodFrom'
+data_MBF['Year'] = data_MBF['RentalPeriodFrom'].dt.year
+
+# Group by 'Year', 'location_postalCode', and 'MappedRealEstateType' to count the observations
+observations_grouped = data_MBF.groupby(['Year', 'location_postalCode', 'MappedRealEstateType']).size()
+
+# Convert the result to a DataFrame for better readability
+observations_grouped_df = observations_grouped.reset_index(name='ObservationCount')
+
+# Display the observations per year, postal code, and real estate type
+print(observations_grouped_df)
+
+#PLOT 4
+import matplotlib.pyplot as plt
+import pandas as pd
+
+# Convert 'RentalPeriodFrom' to datetime format (if it's not already)
+data_MBF['RentalPeriodFrom'] = pd.to_datetime(data_MBF['RentalPeriodFrom'])
+
+# Filter de dataset voor alleen 'Appartement' en 'Rijhuis'
+filtered_df = data_MBF[data_MBF['MappedRealEstateType'].isin(['Appartement', 'Rijhuis'])]
+
+# Maak een nieuwe kolom aan die het jaar van 'RentalPeriodFrom' bevat
+filtered_df['Year'] = filtered_df['RentalPeriodFrom'].dt.year
+
+# Groepeer de data op jaar en MappedRealEstateType, en bereken de gemiddelde duur van huurcontracten
+avg_rental_duration = filtered_df.groupby(['Year', 'MappedRealEstateType'])['RentalDurationDays'].mean().reset_index()
+
+# Plot de evolutie van de gemiddelde huurduur voor appartementen en rijhuizen
+plt.figure(figsize=(10, 6))
+
+# Plot voor Appartementen
+plt.plot(avg_rental_duration[avg_rental_duration['MappedRealEstateType'] == 'Appartement']['Year'],
+         avg_rental_duration[avg_rental_duration['MappedRealEstateType'] == 'Appartement']['RentalDurationDays'],
+         label='Appartementen', marker='o')
+
+# Plot voor Rijhuizen
+plt.plot(avg_rental_duration[avg_rental_duration['MappedRealEstateType'] == 'Rijhuis']['Year'],
+         avg_rental_duration[avg_rental_duration['MappedRealEstateType'] == 'Rijhuis']['RentalDurationDays'],
+         label='Rijhuizen', marker='o')
+
+# Voeg labels en titel toe aan de grafiek
+plt.xlabel('Jaar')
+plt.ylabel('Gemiddelde Huurduur (in dagen)')
+plt.title('Evolutie van de Gemiddelde Huurduur voor Appartementen en Rijhuizen')
+plt.legend()
+
+# Toon de plot
+plt.show()
+ 
+#PLOT 5
+import matplotlib.pyplot as plt
+import pandas as pd
+
+# Zorg ervoor dat 'RentalPeriodFrom' als datetime wordt gelezen
+data_MBF['RentalPeriodFrom'] = pd.to_datetime(data_MBF['RentalPeriodFrom'])
+
+# Zorg ervoor dat 'HuurderDateOfBirth' numeriek is (omdat het geboortejaren zijn)
+data_MBF['HuurderDateOfBirth'] = pd.to_numeric(data_MBF['HuurderDateOfBirth'])
+
+# Bereken de leeftijd van de huurder op basis van het verschil tussen huurstart en geboortejaar
+data_MBF['TenantAge'] = data_MBF['RentalPeriodFrom'].dt.year - data_MBF['HuurderDateOfBirth']
+
+# Filter de dataset voor alleen 'Appartement' en 'Rijhuis'
+filtered_df = data_MBF[data_MBF['MappedRealEstateType'].isin(['Appartement', 'Rijhuis'])]
+
+# Maak een nieuwe kolom aan die het jaar van 'RentalPeriodFrom' bevat
+filtered_df['Year'] = filtered_df['RentalPeriodFrom'].dt.year
+
+# Groepeer de data op jaar en MappedRealEstateType, en bereken de gemiddelde leeftijd van de huurders
+avg_tenant_age = filtered_df.groupby(['Year', 'MappedRealEstateType'])['TenantAge'].mean().reset_index()
+
+# Plot de evolutie van de gemiddelde leeftijd voor appartementen en rijhuizen
+plt.figure(figsize=(10, 6))
+
+# Plot voor Appartementen
+plt.plot(avg_tenant_age[avg_tenant_age['MappedRealEstateType'] == 'Appartement']['Year'],
+         avg_tenant_age[avg_tenant_age['MappedRealEstateType'] == 'Appartement']['TenantAge'],
+         label='Appartementen', marker='o')
+
+# Plot voor Rijhuizen
+plt.plot(avg_tenant_age[avg_tenant_age['MappedRealEstateType'] == 'Rijhuis']['Year'],
+         avg_tenant_age[avg_tenant_age['MappedRealEstateType'] == 'Rijhuis']['TenantAge'],
+         label='Rijhuizen', marker='o')
+
+# Voeg labels en titel toe aan de grafiek
+plt.xlabel('Jaar')
+plt.ylabel('Gemiddelde Leeftijd van Huurders')
+plt.title('Evolutie van de Gemiddelde Leeftijd van Huurders voor Appartementen en Rijhuizen')
+plt.legend()
+
+# Toon de plot
+plt.show()
