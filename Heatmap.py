@@ -51,7 +51,8 @@ median_rental_prices.rename(columns={'location_postalCode': 'postcode', 'RentalF
 # Merge the median rental prices with the GeoDataFrame
 gent_merged = gent_merged.merge(median_rental_prices, on='postcode', how='left')
 
-
+# Fill NaN values with 0 or an appropriate value if necessary
+gent_merged['median_rent'].fillna(0, inplace=True)  # Use a suitable fill value
 
 # Create the map with the reversed colormap
 fig, ax = plt.subplots(figsize=(12, 8))
