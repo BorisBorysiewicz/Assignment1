@@ -710,3 +710,25 @@ data_MBF
 
 
 
+
+
+
+# %% Import necessary libraries
+import pandas as pd
+
+
+
+# %% Filter the data for apartments
+apartments_data = data_MBF[data_MBF['MappedRealEstateType'] == 'Appartement']
+
+# %% Group by postal code and calculate median rental prices
+median_rental_prices = apartments_data.groupby('location_postalCode')['RentalFeeMonthly'].median().reset_index()
+
+# %% Display the results
+print(median_rental_prices)
+
+
+
+
+
+
