@@ -150,6 +150,9 @@ median_rental_prices_2024.rename(columns={'location_postalCode': 'postcode', 'Ad
 gent_merged_2018 = gent_merged.merge(median_rental_prices_2018, on='postcode', how='left')
 gent_merged_2024 = gent_merged.merge(median_rental_prices_2024, on='postcode', how='left')
 
+# Set the median_rent_2024 to NaN for postcode 9042 to create a grey zone
+gent_merged_2024.loc[gent_merged_2024['postcode'] == 9042, 'median_rent_2024'] = float('nan')
+
 # Create the figure and axes
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(18, 8))
 
@@ -184,7 +187,7 @@ for x, y, label, rent in zip(gent_merged_2024.geometry.centroid.x, gent_merged_2
         ax2.text(x, y, label, fontsize=10, ha='center', va='center', color='black')  # Show label even for missing data
 
 # Add a main title to the figure
-fig.suptitle("Comparison of Monthly Rental Fees in Ghent (2018 vs. 2024)", fontsize=16)
+fig.suptitle("Comparison of Median Monthly Rental Fees of Apartments in Ghent (2018 vs. 2024)", fontsize=16)
 
 # Display the plots
 plt.tight_layout()
