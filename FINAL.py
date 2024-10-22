@@ -38,138 +38,57 @@ CPI_filtered['Year'] = CPI_filtered.index.year  # Voeg een jaar kolom toe
 CPI_changes = CPI_filtered.groupby('Year').first().reset_index()  # Neem de eerste waarde per jaar
 CPI_changes['CPIChange'] = ((CPI_changes['Value'] - cpi_baseline) / cpi_baseline) * 100
 
-# ---------------- Huurprijs Verandering ----------------
 
-# Stap 1: Zorg ervoor dat de RentalPeriodFrom kolom in datetime-formaat is
-data_MBF['RentalPeriodFrom'] = pd.to_datetime(data_MBF['RentalPeriodFrom'])
+######## indexed version for all years
 
-# Stap 2: Filter de DataFrame op data vanaf 2018 en voor Appartementen
-filtered_data = data_MBF[
-    (data_MBF['RentalPeriodFrom'] >= '2018-01-01') & 
-    (data_MBF['MappedRealEstateType'] == 'Appartement')
-]
-
-# Stap 3: Extraheer het jaar uit de RentalPeriodFrom kolom
-filtered_data['year'] = filtered_data['RentalPeriodFrom'].dt.year
-
-# Stap 4: Groepeer de data op postcode en jaar, en bereken de mediane huurprijs
-yearly_data = filtered_data.groupby(['location_postalCode', 'year'])['RentalFeeMonthly'].median().reset_index()
-
-# Stap 5: Bereken de procentuele verandering ten opzichte van 2018 voor elke postcode
-def calculate_percentage_change(group):
-    # Controleer of er een baseline waarde voor 2018 is
-    if 2018 in group['year'].values:
-        baseline_value = group.loc[group['year'] == 2018, 'RentalFeeMonthly'].values[0]
-        group['RentalFeeMonthlyChange'] = ((group['RentalFeeMonthly'] - baseline_value) / baseline_value) * 100
-    else:
-        # Als 2018 niet in de groep zit, vul met NaN
-        group['RentalFeeMonthlyChange'] = None
-    return group
-
-# Toepassen van de functie op de groep
-yearly_data = yearly_data.groupby('location_postalCode', as_index=False).apply(calculate_percentage_change)
-
-# Filter voor groepen met een geldige baseline
-yearly_data = yearly_data[yearly_data['RentalFeeMonthlyChange'].notnull()]
-
-# ---------------- Plotten van beide grafieken samen ----------------
-
-# Load the background image
-background_image = mpimg.imread('./Assignment 1/Project/Assignment1/Afbeelding3.png')  # Update path as needed
-
-# Use a set of distinct colors for postal codes
-colors = ['red', 'blue', 'orange', 'purple', 'cyan', 'magenta', 'yellow', 'brown', 'pink']  # List of contrasting colors
-
-# Create a figure and axes
-fig, ax = plt.subplots(figsize=(14, 8))
-
-# Set the image as the background
-ax.imshow(background_image, aspect='auto', extent=[CPI_changes['Year'].min(), CPI_changes['Year'].max(), 
-                                                    min(yearly_data['RentalFeeMonthlyChange']) - 5, 
-                                                    max(yearly_data['RentalFeeMonthlyChange']) + 5], 
-          zorder=-1)
-
-# Plot de huurprijsveranderingen per postcode with distinct colors
-for i, (postcode, group) in enumerate(yearly_data.groupby('location_postalCode')):
-    plt.plot(group['year'], 
-             group['RentalFeeMonthlyChange'], 
-             marker='s',  # Square markers for differentiation
-             color=colors[i % len(colors)],  # Use a distinct color from the list
-             label=f'Postcode {postcode}', 
-             linewidth=4,  # Increased linewidth for better visibility
-             markersize=6,  # Larger markers
-             linestyle='-',  # Solid line style for postal codes
-             alpha=0.85)  # Slight transparency
-
-# Plot de CPI-veranderingen with a big very flashy neon green line
-plt.plot(CPI_changes['Year'], 
-         CPI_changes['CPIChange'], 
-         marker='o',  # Circle markers for enhanced visibility
-         color='lime',  # Flashy neon green color for CPI line
-         label='CPI Verandering (%)', 
-         linewidth=8,  # Increased line width for maximum visibility
-         markersize=10,  # Larger markers
-         linestyle='-',  # Solid line style
-         alpha=1.0,  # Full opacity
-         zorder=2)  # Ensure this line is above all others
-
-# Titles and labels with larger font size
-plt.title('Procentuele verandering van de mediane huurpijs voor appartementen in Gent (vanaf 2018)', fontsize=16, fontweight='bold')  # Increased fontsize
-plt.xlabel('Jaar', fontsize=14)  # Increased fontsize
-plt.ylabel('Procentuele Verandering (%)', fontsize=14)  # Increased fontsize
-
-# X-axis with only years
-plt.xticks(CPI_changes['Year'].unique(), fontsize=16)  # Increased fontsize for x-ticks (years)
-plt.yticks(fontsize=16)  # Increased fontsize for y-ticks (percentages)
-
-# Grid and legend with larger font size
-plt.grid(color='white', linestyle='--', linewidth=0.5)  # White grid lines for better visibility
-plt.legend(title='Postcodes en CPI', bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=12, title_fontsize=14)  # Increased fontsize for legend
-
-# Remove whitespace around the plot
-plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
-
-# Show the plot
-plt.show()
-
-################## Indexed version
-# Step 1: Filter active contracts in 2024 (RentalPeriodTo is >= 2024 or NaT)
-# Ensure RentalPeriodTo is in datetime format
+# Ensure RentalPeriodTo and RentalPeriodFrom are in datetime format
 data_MBF['RentalPeriodTo'] = pd.to_datetime(data_MBF['RentalPeriodTo'], errors='coerce')
+data_MBF['RentalPeriodFrom'] = pd.to_datetime(data_MBF['RentalPeriodFrom'], errors='coerce')
 
-# Filter for active contracts in 2024 (either ongoing or ending in 2024 or later)
-active_2024 = data_MBF[
-    (data_MBF['RentalPeriodTo'].isna()) | (data_MBF['RentalPeriodTo'] >= '2024-01-01')
-]
 # Filter for 'Appartement'
-active_2024_apartments = active_2024[active_2024['MappedRealEstateType'] == 'Appartement']
+apartments = data_MBF[data_MBF['MappedRealEstateType'] == 'Appartement']
+
+# Only consider contracts with RentalPeriodFrom starting in 2018 or later
+apartments = apartments[apartments['RentalPeriodFrom'] >= '2018-01-01']
+
+# CPI DataFrame for 2018 to 2024
+cpi_first_day = CPI_filtered.loc[CPI_filtered.index.isin(pd.date_range('2018-01-01', '2024-01-01', freq='YS'))]
+cpi_first_day.reset_index(inplace=True)  # Reset index to access the year
+
+# Step 1: Create a list of active contracts for each year (2018 to 2024)
+years = [2018, 2019, 2020, 2021, 2022, 2023, 2024]
+active_contracts_per_year = {}
+
+for year in years:
+    # Define the end date for filtering
+    year_end_date = pd.Timestamp(f'{year}-12-31')
+    
+    # Filter for contracts that have started before the end of the given year and are still active
+    active_contracts = apartments[
+        (apartments['RentalPeriodFrom'] <= year_end_date) &  # Contract started before or on Dec 31 of current year
+        ((apartments['RentalPeriodTo'].isna()) | (apartments['RentalPeriodTo'] >= f'{year}-01-01'))  # Contract is still active
+    ].copy()
+    
+    active_contracts_per_year[year] = active_contracts
 
 # Step 2: Create a CPI changes DataFrame with percentage change between all year pairs from 2018 onwards
-
-# Extract CPI values for the first day of each year from 2018 to 2024
-cpi_first_day = CPI_filtered.loc[CPI_filtered.index.isin(pd.date_range('2018-01-01', '2024-01-01', freq='YS'))]
-
-# Reset index to work with years more easily
-cpi_first_day.reset_index(inplace=True)
-
-# Extract the years
 cpi_years = cpi_first_day['Year'].unique()
 
-# Create an empty list to store the results
+# Create an empty list to store the CPI changes
 cpi_differences = []
 
 # Iterate through all possible year pairs
 for start_year in cpi_years:
     for end_year in cpi_years:
         if end_year > start_year:
-            # Get the CPI values for the first day of the start and end years
+            # Get the CPI values for the start and end year
             cpi_start = cpi_first_day.loc[cpi_first_day['Year'] == start_year, 'Value'].values[0]
             cpi_end = cpi_first_day.loc[cpi_first_day['Year'] == end_year, 'Value'].values[0]
             
             # Calculate the percentage change between the two years
             cpi_diff = ((cpi_end - cpi_start) / cpi_start) * 100
             
-            # Append the result to the list
+            # Store the result
             cpi_differences.append({
                 'StartYear': start_year,
                 'EndYear': end_year,
@@ -179,24 +98,21 @@ for start_year in cpi_years:
 # Convert the list to a DataFrame
 cpi_diff_df = pd.DataFrame(cpi_differences)
 
-# Ensure RentalPeriodFrom is in datetime format
-active_2024_apartments['RentalPeriodFrom'] = pd.to_datetime(active_2024_apartments['RentalPeriodFrom'], errors='coerce')
-
-# Exclude rows where RentalPeriodFrom is before 2018
-active_2024_apartments = active_2024_apartments[active_2024_apartments['RentalPeriodFrom'] >= '2018-01-01']
-
-# Define the adjust_rental_fee function to adjust RentalFeeMonthly based on CPI changes
-def adjust_rental_fee(row):
+# Step 3: Define a function to adjust rental fee based on CPI changes
+def adjust_rental_fee(row, current_year):
     start_year = row['RentalPeriodFrom'].year
-    end_year = 2024  # We're adjusting for 2024
-
-    # Find the CPI change between the start year and 2024
+    
+    # If we're adjusting for 2018, the adjusted fee is the same as the original fee
+    if current_year == 2018:
+        return row['RentalFeeMonthly']
+    
+    # Find the CPI change between the start year and the current year
     cpi_change = cpi_diff_df[
         (cpi_diff_df['StartYear'] == start_year) & 
-        (cpi_diff_df['EndYear'] == end_year)
+        (cpi_diff_df['EndYear'] == current_year)
     ]['CPIChange%']
 
-    # If there's no CPI change available for the year, keep the rental fee as is
+    # If no CPI change is available, return the original fee
     if cpi_change.empty:
         return row['RentalFeeMonthly']
     
@@ -204,12 +120,101 @@ def adjust_rental_fee(row):
     adjusted_fee = row['RentalFeeMonthly'] * (1 + (cpi_change.values[0] / 100))
     return adjusted_fee
 
-# Apply the adjustment to RentalFeeMonthly
-active_2024_apartments['AdjustedRentalFeeMonthly'] = active_2024_apartments.apply(adjust_rental_fee, axis=1)
+# Step 4: Create adjusted DataFrames for each year (2018 to 2024)
+adjusted_dataframes = {}
 
-# Display the adjusted DataFrame
-active_2024_apartments.head()
+for year in years:
+    active_contracts = active_contracts_per_year[year].copy()
+    
+    # Adjust the rental fees based on CPI changes
+    active_contracts[f'AdjustedRentalFee_{year}'] = active_contracts.apply(lambda row: adjust_rental_fee(row, year), axis=1)
+    
+    # Store the adjusted DataFrame for the year
+    adjusted_dataframes[year] = active_contracts[['location_postalCode', 'RentalPeriodFrom', 'RentalPeriodTo', 'RentalFeeMonthly', f'AdjustedRentalFee_{year}']]
 
-# Final DataFrame with only the relevant columns
-final_df = active_2024_apartments[['location_postalCode', 'RentalPeriodFrom', 'RentalPeriodTo', 'RentalFeeMonthly', 'AdjustedRentalFeeMonthly']]
+# Now each year has a corresponding DataFrame in `adjusted_dataframes`
+
+#calculate the medians
+# Create a new DataFrame to hold median adjusted rental fees per postal code per year
+median_adjusted_rental_fees = {}
+
+# Loop through each year to calculate the median adjusted rental fee per postal code
+for year in years:
+    # Get the adjusted DataFrame for the current year
+    df = adjusted_dataframes[year]
+    
+    # Calculate the median adjusted rental fee per postal code
+    median_per_postal_code = df.groupby('location_postalCode')[f'AdjustedRentalFee_{year}'].median().reset_index()
+    
+    # Rename the column to indicate the year
+    median_per_postal_code.rename(columns={f'AdjustedRentalFee_{year}': f'MedianAdjustedRentalFee_{year}'}, inplace=True)
+    
+    # Add the results to the main summary dictionary
+    median_adjusted_rental_fees[year] = median_per_postal_code
+
+# Merge the yearly median dataframes into a single dataframe
+median_overview = median_adjusted_rental_fees[years[0]]
+
+for year in years[1:]:
+    median_overview = pd.merge(median_overview, median_adjusted_rental_fees[year], on='location_postalCode', how='outer')
+
+# Remove rows where location_postalCode is 9042 from median_overview
+median_overview = median_overview[median_overview['location_postalCode'] != 9042]
+
+##### PLOT THE INDEX DATA
+
+# Calculate percentage change based on 2018 medians
+for year in years[1:]:  # Skip 2018 since it's the base year
+    median_overview[f'{year}'] = (
+        (median_overview[f'MedianAdjustedRentalFee_{year}'] - median_overview['MedianAdjustedRentalFee_2018']) /
+        median_overview['MedianAdjustedRentalFee_2018']
+    ) * 100
+
+# Add a column for 2018 percentage change, which is 0%
+median_overview['2018'] = 0  # 0% change for the base year
+
+# Prepare data for plotting
+plot_data = median_overview.set_index('location_postalCode')[[  # Include 2018 in the data
+    f'{year}' for year in years
+]].T
+
+
+# Plotting
+# Define the distinct colors for the postal codes
+colors = ['red', 'blue', 'orange', 'purple', 'cyan', 'magenta', 'yellow', 'pink']  # Excluded brown, gray, black, white
+
+# Load the background image
+background_image = mpimg.imread('./Assignment 1/Project/Assignment1/Afbeelding3.png')  # Update path as needed
+
+# Calculate dynamic y-limits
+y_min = plot_data.min().min()  # Minimum value across all years and postal codes
+y_max = plot_data.max().max()  # Maximum value across all years and postal codes
+padding = 5  # Padding to give some space above and below
+
+# Plotting
+plt.figure(figsize=(12, 6))
+
+# Set the background image with adjusted extent
+plt.imshow(background_image, aspect='auto', extent=[-0.5, len(plot_data.index) - 0.5, y_min - padding, y_max + padding])  # Adjust extent based on y-limits
+
+plt.ylim(y_min - padding, y_max + padding)  # Set dynamic y-limits with padding
+
+# Plot each postal code with a distinct color
+for idx, postal_code in enumerate(plot_data.columns):
+    plt.plot(plot_data.index, plot_data[postal_code], marker='o', label=f'Postal Code {postal_code}', 
+             color=colors[idx % len(colors)], linewidth=2, markersize=6)  # Cycle through colors
+
+plt.title('Evolution of Median Monthly Rental Fees for an Appartment per Postal Code (2018 as Base Year, CPI adjusted)')
+plt.xlabel('Year')
+plt.ylabel('Percentage Change (%)')
+plt.axhline(0, color='lightblue', linestyle='--')  # Reference line at 0%
+
+# Set x-ticks to show only years
+plt.xticks(ticks=range(len(plot_data.index)), labels=plot_data.index, rotation=45)
+
+plt.legend(title='Postal Codes', bbox_to_anchor=(1.05, 1), loc='upper left')
+plt.grid()
+plt.tight_layout()
+plt.show()
+
 
