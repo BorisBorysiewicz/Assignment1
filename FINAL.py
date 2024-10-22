@@ -19,7 +19,7 @@ import matplotlib.image as mpimg  # To load the background image
 data_MBF = pd.read_csv('./Assignment 1/MBF_FINAL_2.csv')
 
 # Read the CPI data, setting 'Date' as the index and parsing it as datetime
-CPI = pd.read_csv('./Assignment 1/MBF_PythonBootcamp_Task1_CPI 3.csv', index_col='Date', parse_dates=True)
+CPI = pd.read_csv('./MBF_PythonBootcamp_Task1_CPI.csv', index_col='Date', parse_dates=True)
 
 
 # ---------------- CPI Verandering ----------------
