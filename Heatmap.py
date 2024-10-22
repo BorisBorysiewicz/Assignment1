@@ -44,32 +44,107 @@ for postcode, wijk in postcode_to_wijk.items():
 # Load rental prices data
 data_MBF = pd.read_csv('./MBF_FINAL_2.csv')
 
-# Ensure RentalPeriodFrom and RentalPeriodTo are in datetime format
-data_MBF['RentalPeriodFrom'] = pd.to_datetime(data_MBF['RentalPeriodFrom'])
-data_MBF['RentalPeriodTo'] = pd.to_datetime(data_MBF['RentalPeriodTo'])
+# Load the CPI data
+CPI = pd.read_csv('./MBF_PythonBootcamp_Task1_CPI.csv', index_col='Date', parse_dates=True)
 
-# Filter data for only apartments
-appartments_data = data_MBF[data_MBF['MappedRealEstateType'] == 'Appartement']
 
-# Calculate active contracts for 2018
-active_contracts_2018 = appartments_data[
-    (appartments_data['RentalPeriodFrom'] <= pd.Timestamp(year=2018, month=12, day=31)) & 
-    (appartments_data['RentalPeriodTo'] >= pd.Timestamp(year=2018, month=1, day=1))
+# Ensure RentalPeriodTo and RentalPeriodFrom are in datetime format
+data_MBF['RentalPeriodTo'] = pd.to_datetime(data_MBF['RentalPeriodTo'], errors='coerce')
+data_MBF['RentalPeriodFrom'] = pd.to_datetime(data_MBF['RentalPeriodFrom'], errors='coerce')
+
+# Filter for the year 2018
+data_2018 = data_MBF[data_MBF['RentalPeriodFrom'].dt.year == 2018]
+# + Filter for housetype 'Appartement' for the year 2018
+apartments_2018 = data_2018[data_2018['MappedRealEstateType'] == 'Appartement']
+
+
+
+#Active contracts in 2024
+active_2024 = data_MBF[
+    (data_MBF['RentalPeriodTo'].isna()) | (data_MBF['RentalPeriodTo'] >= '2024-01-01')
 ]
 
-# Calculate active contracts for 2024
-active_contracts_2024 = appartments_data[
-    (appartments_data['RentalPeriodFrom'] <= pd.Timestamp(year=2024, month=12, day=31)) & 
-    (appartments_data['RentalPeriodTo'] >= pd.Timestamp(year=2024, month=1, day=1))
-]
+# Filter for housetype 'Appartement'
+active_2024_apartments = active_2024[active_2024['MappedRealEstateType'] == 'Appartement']
 
-# Calculate median rental prices based on active contracts
-median_rental_prices_2018 = active_contracts_2018.groupby('location_postalCode')['RentalFeeMonthly'].median().reset_index()
-median_rental_prices_2024 = active_contracts_2024.groupby('location_postalCode')['RentalFeeMonthly'].median().reset_index()
+#Filter CPI-data 
+CPI_filtered = CPI[(CPI.index.year >= 2018) & (CPI.index.year <= 2024)]
+
+#Add Year 
+CPI_filtered['Year'] = CPI_filtered.index.year
+
+# Extract CPI values for the first day of each year from 2018 to 2024
+cpi_first_day = CPI_filtered.loc[CPI_filtered.index.isin(pd.date_range('2018-01-01', '2024-01-01', freq='YS'))]
+
+# Reset index to work with years more easily
+cpi_first_day.reset_index(inplace=True)
+
+# Extract the years
+cpi_years = cpi_first_day['Year'].unique()
+
+# Create an empty list to store the results
+cpi_differences = []
+
+# Iterate through all possible year pairs
+for start_year in cpi_years:
+    for end_year in cpi_years:
+        if end_year > start_year:
+            # Get the CPI values for the first day of the start and end years
+            cpi_start = cpi_first_day.loc[cpi_first_day['Year'] == start_year, 'Value'].values[0]
+            cpi_end = cpi_first_day.loc[cpi_first_day['Year'] == end_year, 'Value'].values[0]
+            
+            # Calculate the percentage change between the two years
+            cpi_diff = ((cpi_end - cpi_start) / cpi_start) * 100
+            
+            # Append the result to the list
+            cpi_differences.append({
+                'StartYear': start_year,
+                'EndYear': end_year,
+                'CPIChange%': cpi_diff
+            })
+
+# Convert the list to a DataFrame
+cpi_diff_df = pd.DataFrame(cpi_differences)
+
+
+# Exclude rows where RentalPeriodFrom is before 2018
+active_2024_apartments = active_2024_apartments[active_2024_apartments['RentalPeriodFrom'] >= '2018-01-01']
+
+# Define the adjust_rental_fee function to adjust RentalFeeMonthly based on CPI changes
+def adjust_rental_fee(row):
+    start_year = row['RentalPeriodFrom'].year
+    end_year = 2024  # We're adjusting for 2024
+
+    # Find the CPI change between the start year and 2024
+    cpi_change = cpi_diff_df[
+        (cpi_diff_df['StartYear'] == start_year) & 
+        (cpi_diff_df['EndYear'] == end_year)
+    ]['CPIChange%']
+
+    # If there's no CPI change available for the year, keep the rental fee as is
+    if cpi_change.empty:
+        return row['RentalFeeMonthly']
+    
+    # Adjust the rental fee based on the CPI change
+    adjusted_fee = row['RentalFeeMonthly'] * (1 + (cpi_change.values[0] / 100))
+    return adjusted_fee
+
+# Apply the adjustment to RentalFeeMonthly
+active_2024_apartments['AdjustedRentalFeeMonthly'] = active_2024_apartments.apply(adjust_rental_fee, axis=1)
+
+
+# Final DataFrame with only the relevant columns
+final_df = active_2024_apartments[['location_postalCode', 'RentalPeriodFrom', 'RentalPeriodTo', 'RentalFeeMonthly', 'AdjustedRentalFeeMonthly']]
+
+
+
+# Calculate median rental prices for each year
+median_rental_prices_2018 = apartments_2018.groupby('location_postalCode')['RentalFeeMonthly'].median().reset_index()
+median_rental_prices_2024 = final_df.groupby('location_postalCode')['AdjustedRentalFeeMonthly'].median().reset_index()
 
 # Rename the columns for merging
 median_rental_prices_2018.rename(columns={'location_postalCode': 'postcode', 'RentalFeeMonthly': 'median_rent_2018'}, inplace=True)
-median_rental_prices_2024.rename(columns={'location_postalCode': 'postcode', 'RentalFeeMonthly': 'median_rent_2024'}, inplace=True)
+median_rental_prices_2024.rename(columns={'location_postalCode': 'postcode', 'AdjustedRentalFeeMonthly': 'median_rent_2024'}, inplace=True)
 
 # Merge the median rental prices with the GeoDataFrame for both years
 gent_merged_2018 = gent_merged.merge(median_rental_prices_2018, on='postcode', how='left')
@@ -86,7 +161,7 @@ missing_color = to_rgba('lightgrey')
 
 # Plot the heatmap for 2018
 gent_merged_2018.plot(column='median_rent_2018', cmap=cmap, edgecolor='black', linewidth=0.3, ax=ax1, legend=True, missing_kwds={'color': missing_color})
-ax1.set_title("Median Rental Prices in 2018")
+ax1.set_title("Median Monthly Rental Fees of Apartments in 2018 (Base Year)")
 ax1.axis('off')  # Turn off the axis
 
 # Annotate the map with wijk names and median rent for 2018
@@ -98,7 +173,7 @@ for x, y, label, rent in zip(gent_merged_2018.geometry.centroid.x, gent_merged_2
 
 # Plot the heatmap for 2024
 gent_merged_2024.plot(column='median_rent_2024', cmap=cmap, edgecolor='black', linewidth=0.3, ax=ax2, legend=True, missing_kwds={'color': missing_color})
-ax2.set_title("Median Rental Prices in 2024")
+ax2.set_title("Median Monthly Rental Fees of Apartments in 2024 (CPI Adjusted)")
 ax2.axis('off')  # Turn off the axis
 
 # Annotate the map with wijk names and median rent for 2024
@@ -109,14 +184,9 @@ for x, y, label, rent in zip(gent_merged_2024.geometry.centroid.x, gent_merged_2
         ax2.text(x, y, label, fontsize=10, ha='center', va='center', color='black')  # Show label even for missing data
 
 # Add a main title to the figure
-fig.suptitle("Median Rental Prices Ghent", fontsize=16)
+fig.suptitle("Comparison of Monthly Rental Fees in Ghent (2018 vs. 2024)", fontsize=16)
 
 # Display the plots
 plt.tight_layout()
 plt.show()
-
-
-
-
-
 
