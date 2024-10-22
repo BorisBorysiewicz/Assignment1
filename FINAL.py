@@ -181,7 +181,7 @@ plot_data = median_overview.set_index('location_postalCode')[[  # Include 2018 i
 
 # Plotting
 # Define the distinct colors for the postal codes
-colors = ['red', 'blue', 'orange', 'purple', 'cyan', 'magenta', 'yellow', 'pink']  # Excluded brown, gray, black, white
+colors = ['lime', 'blue', 'orange', 'purple', 'cyan', 'magenta', 'yellow', 'pink', 'red']  # Excluded brown, gray, black, white
 
 # Load the background image
 background_image = mpimg.imread('./Assignment 1/Project/Assignment1/Afbeelding3.png')  # Update path as needed
@@ -190,6 +190,19 @@ background_image = mpimg.imread('./Assignment 1/Project/Assignment1/Afbeelding3.
 y_min = plot_data.min().min()  # Minimum value across all years and postal codes
 y_max = plot_data.max().max()  # Maximum value across all years and postal codes
 padding = 5  # Padding to give some space above and below
+
+# Mapping postal codes to names d
+postal_code_names = {
+    '9000': '9000 Gent',
+    '9040': '9040 Sint-Amandsberg',
+    '9031': '9031 Drongen',
+    '9052': '9052 Zwijnaarde',
+    '9032': '9032 Wondelgem',
+    '9051': '9051 Afsnee, Sint-Denijs-Westrem',
+    '9030': '9030 Mariakerke',
+    '9050': '9050 Gentbrugge, Ledeberg',
+    '9041': '9041 Oostakker'
+}
 
 # Plotting
 plt.figure(figsize=(12, 6))
@@ -201,10 +214,13 @@ plt.ylim(y_min - padding, y_max + padding)  # Set dynamic y-limits with padding
 
 # Plot each postal code with a distinct color
 for idx, postal_code in enumerate(plot_data.columns):
-    plt.plot(plot_data.index, plot_data[postal_code], marker='o', label=f'Postal Code {postal_code}', 
+    # Retrieve the postal code name from the dictionary, default to the code if not found
+    postal_code_name = postal_code_names.get(str(postal_code), postal_code)
+    
+    plt.plot(plot_data.index, plot_data[postal_code], marker='o', label=f'{postal_code_name}', 
              color=colors[idx % len(colors)], linewidth=2, markersize=6)  # Cycle through colors
 
-plt.title('Evolution of Median Monthly Rental Fees for an Appartment per Postal Code (2018 as Base Year, CPI adjusted)')
+plt.title('Evolution of Median Monthly Rental Fees for Apartments per Postal Code (2018 as Base Year, CPI adjusted)')
 plt.xlabel('Year')
 plt.ylabel('Percentage Change (%)')
 plt.axhline(0, color='lightblue', linestyle='--')  # Reference line at 0%
@@ -212,6 +228,7 @@ plt.axhline(0, color='lightblue', linestyle='--')  # Reference line at 0%
 # Set x-ticks to show only years
 plt.xticks(ticks=range(len(plot_data.index)), labels=plot_data.index, rotation=45)
 
+# Updated legend with postal code names
 plt.legend(title='Postal Codes', bbox_to_anchor=(1.05, 1), loc='upper left')
 plt.grid()
 plt.tight_layout()
