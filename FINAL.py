@@ -16,10 +16,10 @@ import matplotlib.image as mpimg  # To load the background image
 # #### obviously those filepaths are custom to your own device
 
 # %%
-data_MBF = pd.read_csv('./Assignment 1/MBF_FINAL_2.csv')
+data_MBF = pd.read_csv('./MBF_FINAL_2.csv')
 
 # Read the CPI data, setting 'Date' as the index and parsing it as datetime
-CPI = pd.read_csv('./Assignment 1/MBF_PythonBootcamp_Task1_CPI 3.csv', index_col='Date', parse_dates=True)
+CPI = pd.read_csv('./MBF_PythonBootcamp_Task1_CPI.csv', index_col='Date', parse_dates=True)
 
 
 # ---------------- CPI Verandering ----------------
@@ -184,7 +184,7 @@ plot_data = median_overview.set_index('location_postalCode')[[  # Include 2018 i
 colors = ['lime', 'blue', 'orange', 'purple', 'cyan', 'magenta', 'yellow', 'pink', 'red']  # Excluded brown, gray, black, white
 
 # Load the background image
-background_image = mpimg.imread('./Assignment 1/Project/Assignment1/Afbeelding3.png')  # Update path as needed
+background_image = mpimg.imread('./Afbeelding3.png')  # Update path as needed
 
 # Calculate dynamic y-limits
 y_min = plot_data.min().min()  # Minimum value across all years and postal codes
