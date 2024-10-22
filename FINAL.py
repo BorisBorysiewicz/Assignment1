@@ -132,3 +132,84 @@ plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
 # Show the plot
 plt.show()
 
+################## Indexed version
+# Step 1: Filter active contracts in 2024 (RentalPeriodTo is >= 2024 or NaT)
+# Ensure RentalPeriodTo is in datetime format
+data_MBF['RentalPeriodTo'] = pd.to_datetime(data_MBF['RentalPeriodTo'], errors='coerce')
+
+# Filter for active contracts in 2024 (either ongoing or ending in 2024 or later)
+active_2024 = data_MBF[
+    (data_MBF['RentalPeriodTo'].isna()) | (data_MBF['RentalPeriodTo'] >= '2024-01-01')
+]
+# Filter for 'Appartement'
+active_2024_apartments = active_2024[active_2024['MappedRealEstateType'] == 'Appartement']
+
+# Step 2: Create a CPI changes DataFrame with percentage change between all year pairs from 2018 onwards
+
+# Extract CPI values for the first day of each year from 2018 to 2024
+cpi_first_day = CPI_filtered.loc[CPI_filtered.index.isin(pd.date_range('2018-01-01', '2024-01-01', freq='YS'))]
+
+# Reset index to work with years more easily
+cpi_first_day.reset_index(inplace=True)
+
+# Extract the years
+cpi_years = cpi_first_day['Year'].unique()
+
+# Create an empty list to store the results
+cpi_differences = []
+
+# Iterate through all possible year pairs
+for start_year in cpi_years:
+    for end_year in cpi_years:
+        if end_year > start_year:
+            # Get the CPI values for the first day of the start and end years
+            cpi_start = cpi_first_day.loc[cpi_first_day['Year'] == start_year, 'Value'].values[0]
+            cpi_end = cpi_first_day.loc[cpi_first_day['Year'] == end_year, 'Value'].values[0]
+            
+            # Calculate the percentage change between the two years
+            cpi_diff = ((cpi_end - cpi_start) / cpi_start) * 100
+            
+            # Append the result to the list
+            cpi_differences.append({
+                'StartYear': start_year,
+                'EndYear': end_year,
+                'CPIChange%': cpi_diff
+            })
+
+# Convert the list to a DataFrame
+cpi_diff_df = pd.DataFrame(cpi_differences)
+
+# Ensure RentalPeriodFrom is in datetime format
+active_2024_apartments['RentalPeriodFrom'] = pd.to_datetime(active_2024_apartments['RentalPeriodFrom'], errors='coerce')
+
+# Exclude rows where RentalPeriodFrom is before 2018
+active_2024_apartments = active_2024_apartments[active_2024_apartments['RentalPeriodFrom'] >= '2018-01-01']
+
+# Define the adjust_rental_fee function to adjust RentalFeeMonthly based on CPI changes
+def adjust_rental_fee(row):
+    start_year = row['RentalPeriodFrom'].year
+    end_year = 2024  # We're adjusting for 2024
+
+    # Find the CPI change between the start year and 2024
+    cpi_change = cpi_diff_df[
+        (cpi_diff_df['StartYear'] == start_year) & 
+        (cpi_diff_df['EndYear'] == end_year)
+    ]['CPIChange%']
+
+    # If there's no CPI change available for the year, keep the rental fee as is
+    if cpi_change.empty:
+        return row['RentalFeeMonthly']
+    
+    # Adjust the rental fee based on the CPI change
+    adjusted_fee = row['RentalFeeMonthly'] * (1 + (cpi_change.values[0] / 100))
+    return adjusted_fee
+
+# Apply the adjustment to RentalFeeMonthly
+active_2024_apartments['AdjustedRentalFeeMonthly'] = active_2024_apartments.apply(adjust_rental_fee, axis=1)
+
+# Display the adjusted DataFrame
+active_2024_apartments.head()
+
+# Final DataFrame with only the relevant columns
+final_df = active_2024_apartments[['location_postalCode', 'RentalPeriodFrom', 'RentalPeriodTo', 'RentalFeeMonthly', 'AdjustedRentalFeeMonthly']]
+
